@@ -1,0 +1,10 @@
+# IDE
+/.idea/
+/.vscode/
+
+# Composer
+vendor/
+composer.lock
+
+# PHPUnit
+phpunit.xml
