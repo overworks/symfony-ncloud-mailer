@@ -3,8 +3,9 @@
 /.vscode/
 
 # Composer
-vendor/
+/vendor/
 composer.lock
 
 # PHPUnit
 phpunit.xml
+.phpunit.result.cache

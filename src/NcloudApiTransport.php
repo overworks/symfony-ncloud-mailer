@@ -23,11 +23,11 @@ class NcloudApiTransport extends AbstractApiTransport
         'JPN' => '/api/v1-jpn',
     ];
 
-    private string $uri;
+    protected string $uri;
 
     public function __construct(
-        private string $accessKey,
-        private string $secretKey,
+        protected string $accessKey,
+        protected string $secretKey,
         string $region = 'KR',
         ?HttpClientInterface $client = null,
         ?EventDispatcherInterface $dispatcher = null,
@@ -46,10 +46,7 @@ class NcloudApiTransport extends AbstractApiTransport
     protected function doSendApi(SentMessage $sentMessage, Email $email, Envelope $envelope): ResponseInterface
     {
         $response = $this->client->request('POST', 'https://'.self::HOST.$this->uri.'/mails', [
-            'headers' => array_merge($this->getRequestHeaders('POST', $this->uri.'/mails'), [
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/json',
-            ]),
+            'headers' => $this->makeRequestHeaders('POST', $this->uri.'/mails'),
             'json' => $this->getPayload($email, $envelope),
         ]);
 
@@ -69,7 +66,7 @@ class NcloudApiTransport extends AbstractApiTransport
         return $response;
     }
 
-    private function getRequestHeaders(string $method, string $uri)
+    private function makeRequestHeaders(string $method, string $uri): array
     {
         $timestamp = ((int) microtime(true)) / 1000;
         $accessKey = $this->accessKey;
@@ -78,11 +75,13 @@ class NcloudApiTransport extends AbstractApiTransport
         $hmac = "{$method} {$uri}\n{$timestamp}\n{$accessKey}";
         $signature = base64_encode(hash_hmac('sha256', $hmac, $secretKey, true));
 
-        return [
+        $headers = [
             'x-ncp-apigw-timestamp' => $timestamp,
             'x-ncp-iam-access-key' => $accessKey,
             'x-ncp-apigw-signature-v2' => $signature,
         ];
+
+        return $headers;
     }
 
     private function getPayload(Email $email, Envelope $envelope): array
@@ -161,7 +160,7 @@ class NcloudApiTransport extends AbstractApiTransport
     private function createFile($attachments): array
     {
         foreach ($attachments as $attachment) {
-            
+            //
         }
         return [];
     }

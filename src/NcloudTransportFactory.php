@@ -2,6 +2,7 @@
 
 namespace Minhyung\Ncloud\Mailer;
 
+use Symfony\Component\Mailer\Exception\IncompleteDsnException;
 use Symfony\Component\Mailer\Exception\UnsupportedSchemeException;
 use Symfony\Component\Mailer\Transport\AbstractTransportFactory;
 use Symfony\Component\Mailer\Transport\Dsn;
@@ -15,12 +16,17 @@ final class NcloudTransportFactory extends AbstractTransportFactory
      */
     public function create(Dsn $dsn): TransportInterface
     {
-        // TODO: Implement create() method.
         $scheme = $dsn->getScheme();
 
         if ('ncloud+api' === $scheme) {
             $accessKey = $dsn->getUser();
+            if (! $accessKey) {
+                throw new IncompleteDsnException('Access Key is required');
+            }
             $secretKey = $dsn->getPassword();
+            if (! $secretKey) {
+                throw new IncompleteDsnException('Secret Key is required');
+            }
             $region = $dsn->getOption('region', 'KR');
 
             return new NcloudApiTransport($accessKey, $secretKey, $region, $this->client, $this->dispatcher, $this->logger);
