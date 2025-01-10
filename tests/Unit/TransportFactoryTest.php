@@ -1,6 +1,6 @@
 <?php
 
-namespace Minhyung\Ncloud\Mailer\Tests;
+namespace Minhyung\Ncloud\Mailer\Tests\Unit;
 
 use Minhyung\Ncloud\Mailer\NcloudApiTransport;
 use Minhyung\Ncloud\Mailer\NcloudTransportFactory;

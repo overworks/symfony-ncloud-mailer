@@ -1,8 +1,9 @@
 <?php
 
-namespace Minhyung\Ncloud\Mailer\Tests;
+namespace Minhyung\Ncloud\Mailer\Tests\Feature;
 
 use Minhyung\Ncloud\Mailer\NcloudApiTransport;
+use Minhyung\Ncloud\Mailer\Tests\TestCase;
 use Symfony\Component\Mailer\Envelope;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\Email;

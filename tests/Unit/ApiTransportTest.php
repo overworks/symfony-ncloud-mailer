@@ -1,8 +1,9 @@
 <?php
 
-namespace Minhyung\Ncloud\Mailer\Tests;
+namespace Minhyung\Ncloud\Mailer\Tests\Unit;
 
 use Minhyung\Ncloud\Mailer\NcloudApiTransport;
+use Minhyung\Ncloud\Mailer\Tests\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
