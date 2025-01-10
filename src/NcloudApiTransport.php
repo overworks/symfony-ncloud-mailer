@@ -6,10 +6,10 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\Envelope;
 use Symfony\Component\Mailer\Exception\HttpTransportException;
-use Symfony\Component\Mailer\Exception\LogicException;
 use Symfony\Component\Mailer\SentMessage;
 use Symfony\Component\Mailer\Transport\AbstractApiTransport;
 use Symfony\Component\Mime\Email;
+use Symfony\Component\Mime\Part\Multipart\FormDataPart;
 use Symfony\Contracts\HttpClient\Exception\DecodingExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -46,37 +46,18 @@ class NcloudApiTransport extends AbstractApiTransport
      * @param  \Symfony\Component\Mailer\Envelope     $envelope
      * @return \Symfony\Contracts\HttpClient\ResponseInterface
      * 
-     * @throws \Symfony\Component\Mailer\Exception\LogicException
      * @throws \Symfony\Component\Mailer\Exception\HttpTransportException
      */
     protected function doSendApi(SentMessage $sentMessage, Email $email, Envelope $envelope): ResponseInterface
     {
+        $fileIds = [];
         $attachments = $email->getAttachments();
         if (! empty($attachments)) {
-            // TODO: Not implemented
-            throw new LogicException();
-        }
-        
-        $response = $this->createMailRequest($email, $envelope);
-        try {
-            $statusCode = $response->getStatusCode();
+            $response = $this->createFile($attachments);
             $result = $response->toArray(false);
-        } catch (DecodingExceptionInterface) {
-            throw new HttpTransportException('Unable to send an email: '.$response->getContent(false).\sprintf(' (code %d).', $statusCode), $response);
-        } catch (TransportExceptionInterface $e) {
-            throw new HttpTransportException('Could not reach the remote server.', $response, 0, $e);
+            $fileIds = array_column($result['files'], 'fileId');
         }
-
-        if (! empty($result['error'])) {
-            throw new HttpTransportException('Unable to send an email: '.$result['error']['message'].\sprintf(' (code %d).', $result['error']['errorCode']), $response);
-        }
-
-        // TODO: 요청 ID.
-        $requestId = $result['requestId'];
-        // TODO: 발송 메일 갯수.
-        $count = $result['count'];
-        
-        return $response;
+        return $this->createMailRequest($email, $envelope, $fileIds);
     }
 
     protected function getTargetUrl(string $relativeUrl = ''): string
@@ -107,7 +88,7 @@ class NcloudApiTransport extends AbstractApiTransport
     /**
      * createMailRequest 호출
      */
-    public function createMailRequest(Email $email, Envelope $envelope, $attachFileIds = [])
+    public function createMailRequest(Email $email, Envelope $envelope, $attachFileIds = []): ResponseInterface
     {
         $method = 'POST';
         $url = $this->getTargetUrl('/mails');
@@ -115,7 +96,17 @@ class NcloudApiTransport extends AbstractApiTransport
             'headers' => $this->makeRequestHeaders($method, $url),
             'json' => $this->getMailPayload($email, $envelope, $attachFileIds),
         ];
-        return $this->client->request($method, 'https://'.self::HOST.$url, $options);
+        $response = $this->client->request($method, 'https://'.self::HOST.$url, $options);
+        $this->checkResponse($response);
+
+        // SentMessage 에 Message-ID를 추가해야하는데... 이건 답이 없어보이지?
+        // $result = $response->toArray(false);
+        // TODO: 요청 ID.
+        // $requestId = $result['requestId'];
+        // TODO: 발송 메일 갯수.
+        // $count = $result['count'];
+
+        return $response;
     }
 
     protected function getMailPayload(Email $email, Envelope $envelope, $attachFileIds = []): array
@@ -180,15 +171,35 @@ class NcloudApiTransport extends AbstractApiTransport
     /**
      * @param  array<\Symfony\Component\Mime\Part\DataPart>  $attachments
      */
-    public function createFile(array $attachments)
+    public function createFile(array $attachments): ResponseInterface
     {
-        // TODO
-
         $method = 'POST';
         $url = $this->getTargetUrl('/files');
+
+        $formData = new FormDataPart(array_map(fn ($item) => ['fileList' => $item], $attachments));
         $options = [
-            'headers' => $this->makeRequestHeaders($method, $url),
+            'headers' => $formData->getPreparedHeaders()->toArray() + $this->makeRequestHeaders($method, $url),
+            'body' => $formData->bodyToString(),
         ];
-        return $this->client->request($method, 'https://'.self::HOST.$url, $options);
+        $response = $this->client->request($method, 'https://'.self::HOST.$url, $options);
+        return $this->checkResponse($response);
+    }
+
+    protected function checkResponse(ResponseInterface $response): ResponseInterface
+    {
+        try {
+            $statusCode = $response->getStatusCode();
+            $result = $response->toArray(false);
+        } catch (DecodingExceptionInterface) {
+            throw new HttpTransportException('Unable to send an email: '.$response->getContent(false).\sprintf(' (code %d).', $statusCode), $response);
+        } catch (TransportExceptionInterface $e) {
+            throw new HttpTransportException('Could not reach the remote server.', $response, 0, $e);
+        }
+
+        if (! empty($result['error'])) {
+            throw new HttpTransportException('Unable to send an email: '.$result['error']['message'].\sprintf(' (code %d).', $result['error']['errorCode']), $response);
+        }
+
+        return $response;
     }
 }

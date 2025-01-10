@@ -11,11 +11,19 @@ class TestCase extends \PHPUnit\Framework\TestCase
     protected $faker = null;
 
     /**
-     * @param  string  $locale
+     * @param  string|null  $locale
      * @return \Faker\Generator
      */
-    protected function faker($locale = Factory::DEFAULT_LOCALE): Generator
+    protected function setUpFaker($locale = null): Generator
     {
-        return $this->faker ??= Factory::create($locale);
+        return $this->faker ??= Factory::create($locale ?? Factory::DEFAULT_LOCALE);
+    }
+
+    /**
+     * @return \Faker\Generator
+     */
+    protected function faker(): Generator
+    {
+        return $this->setUpFaker();
     }
 }

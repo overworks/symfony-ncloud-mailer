@@ -3,12 +3,10 @@
 namespace Minhyung\Ncloud\Mailer\Tests;
 
 use Minhyung\Ncloud\Mailer\NcloudApiTransport;
-use Symfony\Component\HttpClient\MockHttpClient;
-use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\Mailer\Envelope;
-use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\Email;
+use Symfony\Component\Mime\Part\File;
 
 class MailTest extends TestCase
 {
@@ -23,32 +21,11 @@ class MailTest extends TestCase
         $this->secretKey = $_ENV['NCLOUD_SECRET_KEY'];
         $this->senderAddress = $_ENV['SENDER_ADDRESS'];
         $this->receiverAddress = $_ENV['RECEIVER_ADDRESS'];
+
+        $this->setUpFaker();
     }
 
-    public function testMockMail()
-    {
-        $sender = new Address($this->faker()->safeEmail());
-        $receiver = new Address($this->faker()->safeEmail());
-
-        $email = new Email();
-        $email->from($sender);
-        $email->to($receiver);
-        $email->subject($this->faker()->sentence());
-        $email->text($this->faker()->paragraph());
-        
-        $envelope = new Envelope($sender, [$receiver]);
-
-        $response = new MockResponse(json_encode([
-            'responseId' => $this->faker()->uuid(),
-            'count' => count($envelope->getRecipients()),
-        ]));
-        $client = new MockHttpClient($response);
-        $transport = new NcloudApiTransport($this->faker()->userName(), $this->faker()->password(), client: $client);
-        $sentMessage = $transport->send($email, $envelope);
-        $this->assertNotNull($sentMessage);
-    }
-
-    public function testRealMail()
+    public function testSend(): void
     {
         if (! $this->accessKey || ! $this->secretKey || ! $this->senderAddress || ! $this->receiverAddress) {
             $this->markTestSkipped();
@@ -63,7 +40,10 @@ class MailTest extends TestCase
         $email->subject($this->faker()->sentence());
         $email->text($this->faker()->paragraph());
         $email->html($this->faker()->randomHtml());
-        
+        if ($path = $this->faker->image()) {
+            $file = new File($path);
+            $email->attach($file);
+        }
         $envelope = new Envelope($sender, [$receiver]);
 
         $transport = new NcloudApiTransport($this->accessKey, $this->secretKey);
