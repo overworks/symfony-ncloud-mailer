@@ -2,7 +2,7 @@
     "name": "minhyung/ncloud-mailer",
     "description": "Symfony Mailer for Cloud Outbound Mailer",
     "type": "library",
-    "keywords": ["mail", "symfony", "mailer", "ncloud"],
+    "keywords": ["mail", "email", "symfony", "mailer", "ncloud", "naver", "ncp"],
     "license": "MIT",
     "authors": [
         {
@@ -42,6 +42,6 @@
         "sort-packages": true
     },
     "scripts": {
-        "test": "phpunit"
+        "test": "vendor/bin/phpunit"
     }
 }
