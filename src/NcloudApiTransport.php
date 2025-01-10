@@ -6,6 +6,7 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\Envelope;
 use Symfony\Component\Mailer\Exception\HttpTransportException;
+use Symfony\Component\Mailer\Exception\LogicException;
 use Symfony\Component\Mailer\SentMessage;
 use Symfony\Component\Mailer\Transport\AbstractApiTransport;
 use Symfony\Component\Mime\Email;
@@ -23,52 +24,69 @@ class NcloudApiTransport extends AbstractApiTransport
         'JPN' => '/api/v1-jpn',
     ];
 
-    protected string $uri;
-
     public function __construct(
         protected string $accessKey,
         protected string $secretKey,
-        string $region = 'KR',
+        protected string $region = '',
         ?HttpClientInterface $client = null,
         ?EventDispatcherInterface $dispatcher = null,
         ?LoggerInterface $logger = null
     ) {
         parent::__construct($client, $dispatcher, $logger);
-
-        $this->uri = self::URIS[$region];
     }
 
     public function __toString(): string
     {
-        return 'ncloud+api://'.self::HOST;
+        return "ncloud+api://{$this->accessKey}:{$this->secretKey}@default".($this->region ? "?region={$this->region}" : '');
     }
 
+    /**
+     * @param  \Symfony\Component\Mailer\SentMessage  $sentMessage
+     * @param  \Symfony\Component\Mime\Email          $email
+     * @param  \Symfony\Component\Mailer\Envelope     $envelope
+     * @return \Symfony\Contracts\HttpClient\ResponseInterface
+     * 
+     * @throws \Symfony\Component\Mailer\Exception\LogicException
+     * @throws \Symfony\Component\Mailer\Exception\HttpTransportException
+     */
     protected function doSendApi(SentMessage $sentMessage, Email $email, Envelope $envelope): ResponseInterface
     {
-        $response = $this->client->request('POST', 'https://'.self::HOST.$this->uri.'/mails', [
-            'headers' => $this->makeRequestHeaders('POST', $this->uri.'/mails'),
-            'json' => $this->getPayload($email, $envelope),
-        ]);
-
+        $attachments = $email->getAttachments();
+        if (! empty($attachments)) {
+            // TODO: Not implemented
+            throw new LogicException();
+        }
+        
+        $response = $this->createMailRequest($email, $envelope);
         try {
             $statusCode = $response->getStatusCode();
             $result = $response->toArray(false);
         } catch (DecodingExceptionInterface) {
             throw new HttpTransportException('Unable to send an email: '.$response->getContent(false).\sprintf(' (code %d).', $statusCode), $response);
         } catch (TransportExceptionInterface $e) {
-            throw new HttpTransportException('Could not reach the remote Postmark server.', $response, 0, $e);
+            throw new HttpTransportException('Could not reach the remote server.', $response, 0, $e);
         }
 
-        if ($statusCode >= 400) {
-            throw new HttpTransportException('Unable to send an email: '.$result['Message'].\sprintf(' (code %d).', $result['ErrorCode']), $response);
+        if (! empty($result['error'])) {
+            throw new HttpTransportException('Unable to send an email: '.$result['error']['message'].\sprintf(' (code %d).', $result['error']['errorCode']), $response);
         }
+
+        // TODO: 요청 ID.
+        $requestId = $result['requestId'];
+        // TODO: 발송 메일 갯수.
+        $count = $result['count'];
         
         return $response;
     }
 
-    private function makeRequestHeaders(string $method, string $uri): array
+    protected function getTargetUrl(string $relativeUrl = ''): string
     {
-        $timestamp = ((int) microtime(true)) / 1000;
+        return self::URIS[$this->region ?: 'KR'].$relativeUrl;
+    }
+
+    protected function makeRequestHeaders(string $method, string $uri): array
+    {
+        $timestamp = strval(time() * 1000);
         $accessKey = $this->accessKey;
         $secretKey = $this->secretKey;
 
@@ -84,29 +102,42 @@ class NcloudApiTransport extends AbstractApiTransport
         return $headers;
     }
 
-    private function getPayload(Email $email, Envelope $envelope): array
-    {
-        // TODO
+    // 전송에 필요한 API는 두개 뿐이다.
 
+    /**
+     * createMailRequest 호출
+     */
+    public function createMailRequest(Email $email, Envelope $envelope, $attachFileIds = [])
+    {
+        $method = 'POST';
+        $url = $this->getTargetUrl('/mails');
+        $options = [
+            'headers' => $this->makeRequestHeaders($method, $url),
+            'json' => $this->getMailPayload($email, $envelope, $attachFileIds),
+        ];
+        return $this->client->request($method, 'https://'.self::HOST.$url, $options);
+    }
+
+    protected function getMailPayload(Email $email, Envelope $envelope, $attachFileIds = []): array
+    {
         // https://api.ncloud-docs.com/docs/ai-application-service-cloudoutboundmailer-createmailrequest
         $payload = [];
+
         $payload['senderAddress'] = $envelope->getSender()->getAddress();
         if ($senderName = $envelope->getSender()->getName()) {
             $payload['senderName'] = $senderName;
         }
         $payload['title'] = $email->getSubject();
         $payload['recipients'] = $this->getRecipientsPayload($email, $envelope);
-        $payload['body'] = $this->getBody($email);
-
-        // 첨부파일이 있는 경우 먼저 파일을 올리고 ID를 가져온다.
-        if ($attachments = $email->getAttachments()) {
-            $payload['attachFileIds'] = $this->createFile($attachments);
+        $payload['body'] = $email->getHtmlBody() ?? $email->getTextBody();
+        if (! empty($attachFileIds)) {
+            $payload['attachFileIds'] = $attachFileIds;
         }
 
         return $payload;
     }
 
-    private function getRecipientsPayload(Email $email, Envelope $envelope): array
+    protected function getRecipientsPayload(Email $email, Envelope $envelope): array
     {
         $recipients = [];
 
@@ -146,23 +177,18 @@ class NcloudApiTransport extends AbstractApiTransport
         return $recipients;
     }
 
-    private function getBody(Email $email): string
-    {
-        // TODO: 첨부파일은 빼고 text 혹은 html 파트만 보내줘야한다...
-
-        return $email->getTextBody();
-    }
-
     /**
-     * @param  \Symfony\Component\Mime\Part\DataPart[]  $attachments
-     * @return array
+     * @param  array<\Symfony\Component\Mime\Part\DataPart>  $attachments
      */
-    private function createFile($attachments): array
+    public function createFile(array $attachments)
     {
-        foreach ($attachments as $attachment) {
-            //
-        }
-        return [];
-    }
+        // TODO
 
+        $method = 'POST';
+        $url = $this->getTargetUrl('/files');
+        $options = [
+            'headers' => $this->makeRequestHeaders($method, $url),
+        ];
+        return $this->client->request($method, 'https://'.self::HOST.$url, $options);
+    }
 }

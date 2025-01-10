@@ -11,8 +11,8 @@ use Symfony\Component\Mailer\Transport\TransportInterface;
 final class NcloudTransportFactory extends AbstractTransportFactory
 {
     /**
-     * @throws UnsupportedSchemeException
-     * @throws IncompleteDsnException
+     * @throws \Symfony\Component\Mailer\Exception\UnsupportedSchemeException
+     * @throws \Symfony\Component\Mailer\Exception\IncompleteDsnException
      */
     public function create(Dsn $dsn): TransportInterface
     {
@@ -27,7 +27,7 @@ final class NcloudTransportFactory extends AbstractTransportFactory
             if (! $secretKey) {
                 throw new IncompleteDsnException('Secret Key is required');
             }
-            $region = $dsn->getOption('region', 'KR');
+            $region = $dsn->getOption('region', '');
 
             return new NcloudApiTransport($accessKey, $secretKey, $region, $this->client, $this->dispatcher, $this->logger);
         }

@@ -18,5 +18,7 @@
     <php>
         <env name="NCLOUD_ACCESS_KEY" value=""/>
         <env name="NCLOUD_SECRET_KEY" value=""/>
+        <env name="SENDER_ADDRESS" value=""/>
+        <env name="RECEIVER_ADDRESS" value=""/>
     </php>
 </phpunit>

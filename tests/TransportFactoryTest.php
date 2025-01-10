@@ -30,6 +30,7 @@ class TransportFactoryTest extends AbstractTransportFactoryTestCase
 		$secretKey = static::PASSWORD;
 		$region = 'KR';
 		return [
+			[Dsn::fromString("ncloud+api://{$accessKey}:{$secretKey}@default"), new NcloudApiTransport($accessKey, $secretKey)],
 			[Dsn::fromString("ncloud+api://{$accessKey}:{$secretKey}@default?region={$region}"), new NcloudApiTransport($accessKey, $secretKey, $region)],
 		];
 	}
