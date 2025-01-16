@@ -30,7 +30,7 @@ class ApiTransportTest extends TestCase
         $this->assertEquals($dsn, (string) $transport);
     }
 
-    public function testSend()
+    public function testSend(): void
     {
         $sender = new Address($this->faker->safeEmail());
         $receiver = new Address($this->faker->safeEmail());

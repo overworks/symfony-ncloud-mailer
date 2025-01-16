@@ -35,6 +35,9 @@ final class NcloudTransportFactory extends AbstractTransportFactory
         throw new UnsupportedSchemeException($dsn, 'ncloud', $this->getSupportedSchemes());
     }
 
+    /**
+     * @return string[]
+     */
     protected function getSupportedSchemes(): array
     {
         return ['ncloud+api'];

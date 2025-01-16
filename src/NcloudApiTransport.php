@@ -65,6 +65,11 @@ class NcloudApiTransport extends AbstractApiTransport
         return self::URIS[$this->region ?: 'KR'].$relativeUrl;
     }
 
+    /**
+     * @param  string  $method
+     * @param  string  $uri
+     * @return array<string, string>
+     */
     protected function makeRequestHeaders(string $method, string $uri): array
     {
         $timestamp = strval(time() * 1000);
@@ -87,8 +92,13 @@ class NcloudApiTransport extends AbstractApiTransport
 
     /**
      * createMailRequest 호출
+     * 
+     * @param  \Symfony\Component\Mime\Email  $email
+     * @param  \Symfony\Component\Mailer\Envelope  $envelope
+     * @param  array<int, int>  $attachFileIds
+     * @return \Symfony\Contracts\HttpClient\ResponseInterface
      */
-    public function createMailRequest(Email $email, Envelope $envelope, $attachFileIds = []): ResponseInterface
+    public function createMailRequest(Email $email, Envelope $envelope, array $attachFileIds = []): ResponseInterface
     {
         $method = 'POST';
         $url = $this->getTargetUrl('/mails');
@@ -109,7 +119,13 @@ class NcloudApiTransport extends AbstractApiTransport
         return $response;
     }
 
-    protected function getMailPayload(Email $email, Envelope $envelope, $attachFileIds = []): array
+    /**
+     * @param  \Symfony\Component\Mime\Email  $email
+     * @param  \Symfony\Component\Mailer\Envelope  $envelope
+     * @param  array<int, int>  $attachFileIds
+     * @return array<string, mixed>
+     */
+    protected function getMailPayload(Email $email, Envelope $envelope, array $attachFileIds = []): array
     {
         // https://api.ncloud-docs.com/docs/ai-application-service-cloudoutboundmailer-createmailrequest
         $payload = [];
@@ -128,6 +144,11 @@ class NcloudApiTransport extends AbstractApiTransport
         return $payload;
     }
 
+    /**
+     * @param  \Symfony\Component\Mime\Email  $email
+     * @param  \Symfony\Component\Mailer\Envelope  $envelope
+     * @return array<int, mixed>
+     */
     protected function getRecipientsPayload(Email $email, Envelope $envelope): array
     {
         $recipients = [];
@@ -187,8 +208,8 @@ class NcloudApiTransport extends AbstractApiTransport
 
     protected function checkResponse(ResponseInterface $response): ResponseInterface
     {
+        $statusCode = $response->getStatusCode();
         try {
-            $statusCode = $response->getStatusCode();
             $result = $response->toArray(false);
         } catch (DecodingExceptionInterface) {
             throw new HttpTransportException('Unable to send an email: '.$response->getContent(false).\sprintf(' (code %d).', $statusCode), $response);

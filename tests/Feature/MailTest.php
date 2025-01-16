@@ -11,10 +11,10 @@ use Symfony\Component\Mime\Part\File;
 
 class MailTest extends TestCase
 {
-    protected $accessKey;
-    protected $secretKey;
-    protected $senderAddress;
-    protected $receiverAddress;
+    protected string $accessKey = '';
+    protected string $secretKey = '';
+    protected string $senderAddress = '';
+    protected string $receiverAddress = '';
 
     protected function setUp(): void
     {
@@ -42,8 +42,7 @@ class MailTest extends TestCase
         $email->text($this->faker()->paragraph());
         $email->html($this->faker()->randomHtml());
         if ($path = $this->faker->image()) {
-            $file = new File($path);
-            $email->attach($file);
+            $email->attachFromPath($path);
         }
         $envelope = new Envelope($sender, [$receiver]);
 
